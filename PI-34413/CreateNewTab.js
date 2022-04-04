@@ -187,7 +187,7 @@ class CreateNewTab extends Component {
         getProgress(surveyScreen, addMemScreen, publishScreen);
         {
             surveyScreen &&
-                document.addEventListener('mousedown', this.handleClickOutside)
+                document.addEventListener("mousedown", this.handleClickOutside,true)
         }
         if (prePopulateData) {
             var category = { 'value': prePopulateData.templateCategoryDesc, 'label': prePopulateData.templateCategoryDesc, 'sguid': prePopulateData.templateCategorySguid }
@@ -301,6 +301,10 @@ class CreateNewTab extends Component {
             })
         }
     }
+
+    componentWillUnmount() {
+        document.removeEventListener("mousedown", this.handleClickOutside, true);
+      }
 
     handleClickOutside = (event) => {
         const { activeQsnIndex, duplicateIdx, questionsArr } = this.state
@@ -1267,6 +1271,7 @@ class CreateNewTab extends Component {
                                                                         placeholder={choice.placeHolder}
                                                                         maxLength={75}
                                                                         onClick={() => this.setState({ selectedChoiceEle: choice.text, selectedChoiceIndex: indx })}
+                                                                        onMouseDown={() => this.setState({ selectedChoiceEle: choice.text, selectedChoiceIndex: indx })}
                                                                         onChange={(evt) => this.handleChoiceChange(evt, indx, qsnIndex)}
                                                                         value={choice.text}
                                                                     />
@@ -1488,11 +1493,11 @@ class CreateNewTab extends Component {
                         </div>
                         <div className="d-flex justify-content-between">
                             <div className="d-grid">
-                                <small>0</small>
-                                {surveypreview && <small>{questionsArr[index].rating.MinValue}</small>}</div>
+                                {surveypreview && <small>{questionsArr[index].rating.MinValue}</small>}
+                                <small>0</small></div>
                             <div className="d-grid">
-                                <small>10</small>
-                                {surveypreview && <small>{questionsArr[index].rating.MaxValue}</small>}</div>
+                                {surveypreview && <small>{questionsArr[index].rating.MaxValue}</small>}
+                                <small>10</small></div>
                         </div>
                         {!surveypreview &&
                             <div className="d-flex my-3">
@@ -1689,7 +1694,6 @@ class CreateNewTab extends Component {
                                                 questionsArr[index].showDate = false;
                                                 questionsArr[index].showTable = true;
                                                 questionsArr[index].questionType = "questionTable";
-                                                questionsArr[index].defaultQuestionType = "Table";
                                                 questionsArr[index].selectedQsnType = { value: "Table", label: "Table" };
                                             } else {
                                                 questionsArr[index].showSelectList = false;
@@ -1719,6 +1723,7 @@ class CreateNewTab extends Component {
                                         }}
                                         value={eachQuestion.question}
                                         onClick={() => this.setState({ selectedQuestionIndex: index })}
+                                        onMouseDown={() => this.setState({ selectedQuestionIndex: index })}
                                     />
                                     <div className="row">
                                         <div className="col-8">
@@ -1772,6 +1777,7 @@ class CreateNewTab extends Component {
                             onChange={this.handleChange}
                             value={surveyTitle}
                             onClick={() => this.setState({ surveyTitleSelected: true })}
+                            onMouseDown={() => this.setState({ surveyTitleSelected: true })}
                         />
                     </div>
                     {surveyTitleSelected &&
@@ -1803,7 +1809,9 @@ class CreateNewTab extends Component {
                             onChange={this.handleChange} value={description}
                             maxlength="500"
                             placeholder={t('survey.descriptionPH')}
-                            onClick={() => this.setState({ descriptionSelected: true })}></textarea>
+                            onClick={() => this.setState({ descriptionSelected: true })}
+                            onMouseDown={() => this.setState({ descriptionSelected: true })}
+                            ></textarea>
                     </div>
                     {descriptionSelected &&
                         <small className="float-right mt-n2" style={{ fontSize: '12px' }}>
@@ -1875,20 +1883,12 @@ class CreateNewTab extends Component {
                                         &nbsp;<i className="fa fa-spinner fa-spin"></i>
                                     </span>}
                             </button> :
-                            this.state.questionsArr[0].defaultQuestionType==="Table"?
-                            <button className={surveyTitle !== "" && description !== "" && category && this.state.isMatrixSaved && !questionError ?
+                            <button className={surveyTitle !== "" && description !== "" && category && !questionError ?
                                 "py-2 btn-primary btn-border-radius normal border-0 px-3" :
                                 "py-2 app-blue-badge-pill bg-dark-gray btn-border-radius normal border-0 px-3 font-weight-lighter"}
                                 onClick={this.addMembers}
-                                disabled={surveyTitle !== "" && description !== "" && category && this.state.isMatrixSaved && !questionError ? false : true}>
-                                <span className={surveyTitle !== "" && description !== "" && category && this.state.isMatrixSaved && !questionError ? "text-white" : "text-gray"}>{t('survey.addMembers')}</span>
-                            </button>:
-                            <button className={surveyTitle !== "" && description !== "" && category  && !questionError ?
-                                "py-2 btn-primary btn-border-radius normal border-0 px-3" :
-                                "py-2 app-blue-badge-pill bg-dark-gray btn-border-radius normal border-0 px-3 font-weight-lighter"}
-                                onClick={this.addMembers}
-                                disabled={surveyTitle !== "" && description !== "" && category  && !questionError ? false : true}>
-                                <span className={surveyTitle !== "" && description !== "" && category  && !questionError ? "text-white" : "text-gray"}>{t('survey.addMembers')}</span>
+                                disabled={surveyTitle !== "" && description !== "" && category && !questionError ? false : true}>
+                                <span className={surveyTitle !== "" && description !== "" && category && !questionError ? "text-white" : "text-gray"}>{t('survey.addMembers')}</span>
                             </button>
                     }
                 </div>

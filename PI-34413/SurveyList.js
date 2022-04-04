@@ -692,16 +692,17 @@ class SurveyList extends Component {
                 if (ratingType == "Slider") {
                     return (
                         <div className="col-7 pt-3 pl-0">
+                            <div className="d-flex justify-content-between pt-1">
+                                <small>{eachSurvey.rating && eachSurvey.rating.minValue}</small>
+                                <small>{eachSurvey.rating && eachSurvey.rating.maxValue}</small>
+                            </div>
                             <div className="input-range">
                                 <IOSSlider step={1} min={0} max={10}
                                     valueLabelDisplay="on" defaultValue={eachSurvey.rating && eachSurvey.rating.AnswerValue && Number(eachSurvey.rating.AnswerValue)}
                                     onChange={(evt, val) => this.onSliderChange(evt, val, eachSurvey)}
                                 />
                             </div>
-                            <div className="d-flex justify-content-between pt-1">
-                                <small>{eachSurvey.rating && eachSurvey.rating.minValue}</small>
-                                <small>{eachSurvey.rating && eachSurvey.rating.maxValue}</small>
-                            </div>
+                            
                         </div>
                     )
                 }
@@ -1089,12 +1090,14 @@ class SurveyList extends Component {
                 <div className="line" />
                 <div className="row pt-2">
                     <div className="col-md-12">
-                        <div className="d-flex justify-content-between align-items-center">
-                            <p className="text-gray x-small">(i)<span className="ml-1">{t('survey.editTextInfo')}</span></p>
-                            <button className="button" disabled={false}
-                                onClick={() => this.onEditAnswers(item)}>
-                                <p className="text-primary">{t('survey.editAnswers')}</p>
-                            </button>
+                        <div className="row d-flex align-items-center">
+                            <p className="col col-lg-8 text-gray x-small">(i)<span className="ml-1">{t('survey.editTextInfo')}</span></p>
+                            <div className="col col-lg-4">
+                                <button className="button" disabled={false}
+                                    onClick={() => this.onEditAnswers(item)}>
+                                    <p className="text-primary">{t('survey.editAnswers')}</p>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1180,8 +1183,8 @@ class SurveyList extends Component {
                                         <p className="text-gray ml-2 normal pre-wrap">{item.surveyTemplateDesc}</p>
                                     </div>
 
-                                    <div className="d-flex flex-sm-row flex-column justify-content-between align-items-start pt-3 pb-3">
-                                        <div className="d-flex flex-fill" style={{ wordBreak: 'break-word', overflow: 'hidden' }}>
+                                    <div className="row pt-3 pb-3">
+                                        <div className="d-flex col-12 col-lg-4" style={{ wordBreak: 'break-word', overflow: 'hidden' }}>
                                             <div className="mr-2">
                                                 <ImageUtils
                                                     src={item.creatorImageUrl}
@@ -1197,7 +1200,7 @@ class SurveyList extends Component {
                                             </div>
                                         </div>
 
-                                        <div className="d-flex flex-fill" style={{ wordBreak: 'break-word', overflow: 'hidden' }}>
+                                        <div className="d-flex col-12 col-lg-4 mt-3 mt-lg-0" style={{ wordBreak: 'break-word', overflow: 'hidden' }}>
                                             <div className="mr-2 bg-light-red rounded-circle text-center d-table"
                                                 style={{ width: 36, height: 36 }}>
                                                 <i className="far fa-clock text-danger d-table-cell align-middle"></i>
@@ -1207,7 +1210,7 @@ class SurveyList extends Component {
                                                 <p className="x-small text-gray">{item.surveyStatus === "COMPLETED" ? t('survey.suveyCompleted') : item.surveyStatus === "EXPIRED" ? t('survey.closed') : item.surveyStatus === "CANCELLED" ? t('survey.surveyCancelled') : t('survey.closingDate')}</p>
                                             </div>
                                         </div>
-                                        <div>
+                                        <div className="col-12 col-lg-4 mt-3 mt-lg-0">
                                             {this.renderButton(item, index)}
                                         </div>
                                     </div>

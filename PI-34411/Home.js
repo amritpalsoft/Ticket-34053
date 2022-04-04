@@ -50,6 +50,7 @@ import ReplyEditor from './ReplyEditor';
 import store from "../../redux/store";
 import Spinner from '../../components/Spinner/spinner';
 import DocumentFeed from './DocumentFeed';
+import VideoFeed from './VideoFeed';
 import TextFormat from './TextFormat';
 import LikedUserModal from './LikedUserModal';
 import LinkPreviewFeed from './LinkPreviewFeed';
@@ -58,13 +59,13 @@ import ErrorHandling from '../../api/ErrorHandling';
 import moment from 'moment';
 import { StorageService } from '../../components/Services/storage';
 
-
+const supportedExtension = /mp4|mov|wmv|avi|mkv|flv|3gp/gi;
 const Storage = new StorageUtils();
 const base64Svc = new Base64Service();
 const storageSvc = new StorageService();
 const showFeedChar = 600;
 const showCommentChar = 130;
-const showReplyChar = 300;
+const showReplyChar = 100;
 const qs = require('qs');
 
 class Home extends React.Component {
@@ -78,6 +79,7 @@ class Home extends React.Component {
         this.replySendInput = React.createRef();
         this.emojiReplyInput = React.createRef();
         this.editorInput = React.createRef();
+        this.playerRef = React.createRef(null);
         this.commentEditors={};
         this.replyEditors={};
         this.state={
@@ -183,6 +185,18 @@ class Home extends React.Component {
         })
         this.getSpaceFeeds(spaceId);
     }
+    handlePlayerReady = (player) => {
+        this.playerRef.current = player;
+    
+        // you can handle player events here
+        player.on('waiting', () => {
+          console.log('player is waiting');
+        });
+    
+        player.on('dispose', () => {
+          console.log('player will dispose');
+        });
+      };
 
     getAllUsers() {
         this.setState({ loading: 1 });
@@ -315,6 +329,11 @@ class Home extends React.Component {
                 profileInfo: user
             })
         } 
+    }
+
+    isLoadedFromTeams() {
+        const UserProfile = Storage.getProfile();;
+        this.props.history.push('/profile', {email: UserProfile.email});
     }
 
     getFeedPosts(pgNo, pgSize, type, afterPost, pinPost) {
@@ -501,7 +520,8 @@ class Home extends React.Component {
             postText: feed.Content,
             editFeedId: feed.Id,
             editMentions: GetUserMentions(feed.Content),
-            editRawState: rawState
+            editRawState: rawState,
+            editFeedData: feed
         })
     }
 
@@ -1012,7 +1032,10 @@ class Home extends React.Component {
                         </div>
                         <div className="row d-flex align-items-start pt-3 pl-1 ml-n3 mr-n3">
                             <div className="col-12">
-                                <div className="d-flex">
+                                <div className="d-flex pointer"
+                                onClick={()=>{
+                                    this.props.history.push('/profile', {email: eachComment.Email});
+                                }}>
                                     <ImageUtils 
                                         src={eachComment.UserImageUrl} 
                                         name={eachComment.FullName}
@@ -1024,12 +1047,12 @@ class Home extends React.Component {
                                             <TextFormat 
                                                 content={eachComment.Content} 
                                                 id={eachComment.Id}
-                                                showChar={eachComment.Content.length} 
+                                                showChar={showCommentChar} 
                                                 seeMoreIndx={seeMoreCommentIndx} 
                                                 type="comment" 
                                             />
                                         </p>
-                                            {/* {(eachComment.Content.length > showCommentChar) &&
+                                            {(eachComment.Content.length > showCommentChar) &&
                                             <div className="row justify-content-end"> 
                                                 <div className="float-right pr-4">
                                                         <p className="pl-2 normal text-light-gray font-weight-bold pointer"
@@ -1037,7 +1060,7 @@ class Home extends React.Component {
                                                             {seeMoreCommentIndx.includes(eachComment.Id) ? null : t('newsFeed.seeMore')}
                                                         </p>
                                                 </div>
-                                            </div>} */}
+                                            </div>}
                                     </div>
                                 </div>
                             </div>
@@ -1142,7 +1165,10 @@ class Home extends React.Component {
                             </div>
                             <div className="row d-flex align-items-start pt-2" style={{background: "#FDFDFD"}}>
                                 <div className="col-11 col-md-11 col-lg-11 col-sm-11 col-xl-11 offset-md-1">
-                                    <div className="d-flex ml-2">
+                                    <div className="d-flex ml-2 pointer"
+                                    onClick={()=>{
+                                                    this.props.history.push('/profile', {email: eachReply.Email});
+                                                }}>
                                         <ImageUtils 
                                             src={eachReply.ImageUrl} 
                                             name={eachReply.FullName}
@@ -1154,13 +1180,13 @@ class Home extends React.Component {
                                                 <TextFormat 
                                                     content={eachReply.Content} 
                                                     id={eachReply.Id}
-                                                    showChar={eachReply.Content.length} 
+                                                    showChar={showReplyChar} 
                                                     seeMoreIndx={seeMoreReplyIndx} 
                                                     type="reply" 
                                                 />
                                             </p>
                                             <p className="font-weight-normal small text-light-gray pt-2">{getexactTimeOrdate(eachReply.CreatedTime)}</p>
-                                            {/* {(eachReply.Content.length > showReplyChar) &&
+                                            {(eachReply.Content.length > showReplyChar) &&
                                                  <div className="row justify-content-end"> 
                                                    <div className="float-right pr-4">
                                                         <p className="pl-2 small text-light-gray font-weight-bold pointer"
@@ -1168,7 +1194,7 @@ class Home extends React.Component {
                                                              {seeMoreReplyIndx.includes(eachReply.Id) ? null : t('newsFeed.seeMore')}
                                                         </p>
                                                    </div>
-                                                </div>} */}
+                                                </div>}
                                         </div>
                                     </div>
                                 </div>
@@ -1409,6 +1435,8 @@ class Home extends React.Component {
             return this.renderUrlPreview(feed);
         } else if(GetPostType(feed) === "document" || GetPostType(feed) === "documentwithurl") {
             return this.renderDocument(feed);
+        } else if(GetPostType(feed) === "video") {
+            return this.renderVideo(feed);
         } else {
             return
         }
@@ -1420,6 +1448,19 @@ class Home extends React.Component {
 
     renderDocument(feed){
         return <DocumentFeed feed={feed} />;
+    }
+
+    addViewCount = () => {
+
+    }
+
+    renderVideo(feed){
+        let isSupportedExtension = feed.Images[0].toLowerCase().search(supportedExtension) > -1;
+        if(isSupportedExtension) {
+            return <VideoFeed feed={feed} playing={this.addViewCount} />;
+        } else {
+            return null;
+        }
     }
 
     renderFeedImages(feed) {
@@ -1636,6 +1677,7 @@ class Home extends React.Component {
         const { hashtagView,viewPinnedFeeds, feeds, pinFeeds, loading, pinLoading, seeMoreFeedIndx,enabledCommentsIds, profileInfo, commentsEditorStateObj, appreciateLoading, appreciateFeedId, spinnerLoading, spinnerCommentId, hasMore } = this.state;
         const profilePicture = store.getState().profileInfo.profileInfo.ImageUrl;
         let allFeeds = (viewPinnedFeeds || hashtagView) ? feeds :  [...pinFeeds, ...feeds];
+        let uniqueFeedArr = allFeeds.filter((v,i,a)=>a.findIndex(v2=>(v2.Id===v.Id))===i);
         return (
             <div className="row">
                 <div className="col-xl-8">
@@ -1649,12 +1691,16 @@ class Home extends React.Component {
                         initialLoad={false}
                         loader={<div className="loader text-center" key={0}>Loading ...</div>}
                     >
-                    {allFeeds.length > 0 ?
-                        allFeeds.map((feed, indx) => {
+                    {uniqueFeedArr.length > 0 ?
+                        uniqueFeedArr.map((feed, indx) => {
                             return (
                                     <div className="app-card feed-wrap mb-3" key={feed.Id}>
                                         <div className="d-flex align-items-center justify-content-between">
-                                            <div className="d-flex align-items-center">
+                                            <div className="d-flex pointer align-items-center"
+                                                
+                                                onClick={()=>{
+                                                    this.props.history.push('/profile', {email: feed.Email});
+                                                }}>
                                                 <ImageUtils 
                                                     src={feed.UserImageUrl} 
                                                     name={feed.FullName}
@@ -1769,6 +1815,7 @@ class Home extends React.Component {
                                             <div className="col-12 col-md-12 col-lg-12 col-sm-12 col-xl-12">
                                                 {getIsEnabled(AllFeatures.FE_FEED_POSTCOMMENT) && enabledCommentsIds.includes(feed.Id) &&
                                                 <div className="d-flex align-items-center">
+                                                
                                                     <ImageUtils 
                                                         src={profilePicture}
                                                         name={profileInfo && profileInfo.FullName}
@@ -1897,7 +1944,7 @@ class Home extends React.Component {
     }
 
     render() {
-        const {sharePostModal, profileInfo, editPostMode, allSpaces, postText, editFeedId, editMentions, editRawState, userList} = this.state;
+        const {sharePostModal, profileInfo, editPostMode, allSpaces, postText, editFeedId, editMentions, editRawState, editFeedData, userList} = this.state;
         return (
             <div className="container">
                 <ToastsContainer store={ToastsStore} position={ToastsContainerPosition.TOP_RIGHT} />  
@@ -1910,7 +1957,7 @@ class Home extends React.Component {
                 {this.renderFeedContent()}
                 {this.renderPeopleWhoLiked()}
                 {sharePostModal && <SharePost sharePostModal={sharePostModal} profileInfo={profileInfo} editPostMode={editPostMode} 
-                    editMentions={editMentions} editRawState={editRawState}
+                    editMentions={editMentions} editRawState={editRawState} editFeedData={editFeedData}
                     getFeedPosts={this.getFeedPosts.bind(this)} getAllSpaces={this.getAllSpaces.bind(this)} closeModalValues={this.closeModalValues.bind(this)} 
                     getFeedPostById={this.getFeedPostById.bind(this)} userList={userList}
                     allSpaces={allSpaces} postText={postText} editFeedId={editFeedId} />}
