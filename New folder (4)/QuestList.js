@@ -29,6 +29,7 @@ class QuestList extends React.Component {
         super(props);
         this.state = {
             questList: [],
+            ifExpired:true,
             avatars: [],
             badgeInfo: [],
             openModal: 0,
@@ -37,8 +38,7 @@ class QuestList extends React.Component {
             language: 'en'
         }
     }
-    
-    refreshQuestList() {
+     refreshQuestList() {
         this.props.getQuestList();
         this.props.getTabCount();
     }
@@ -114,25 +114,27 @@ class QuestList extends React.Component {
         const marginB = this.props.marginBottom;
         let questList = this.props.questList;
         const {t} = this.props;
-        if(true){
         if (this.props.questModalId) {
             const result = this.props.questList.filter(obj => {
                 return obj.QuestId === this.props.questModalId
             })
             
-            if(result.length===0){
-               
+            if(result.length===0 && this.state.ifExpired){
                 this.props.questResults()
                 const result2 = this.props.questList.filter(obj => {
                     return obj.QuestId === this.props.questModalId
                 })
-               
-                questList=result2
+
+                if(result2.length===0){
+                    this.setState({ifExpired:false})
+                 }else{
+                    questList=result2
+                }
             }else{
                 questList=result
-            }
+               }
         }
-    }
+    
         return(
              this.props.loading ? <Loading/>
             :

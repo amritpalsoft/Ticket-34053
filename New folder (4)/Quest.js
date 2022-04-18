@@ -1,102 +1,62 @@
 import React from 'react';
-import { withRouter } from 'react-router-dom';
 import './quest.scss';
 import '../../assets/css/floating-labels.css';
-import bannerIcon from '../../assets/images/quest_banner_img.png';
+import badgeIcon from '../../assets/icons/nobadge.png';
+import emptyQuest from '../../assets/images/empty/quest.svg';
 import { Api } from './../../api/Api';
 import GetAPIHeader from './../../api/ApiCaller';
 import ErrorHandling from './../../api/ErrorHandling';
-import QuestList from './QuestList';
-import PendingTab from './pendingTab';
-import CircularProgressBar from './../../components/progressBar/CircularProgressBar';
-import { easeQuadInOut } from "d3-ease";
-import HeaderBanner from '../../components/Banner/headerBanner';
-import $ from "jquery";
-import { withTranslation } from 'react-i18next';
-import AdminQuest from './AdminQuest';
-import SlimLoader from './../../components/SlimLoader/slimLoader';
+import moment from 'moment';
+import Stepper from './VerticalProgressBar';
+import { PointsFormat } from '../../components/numberFormatter/NumberFormatter';
+import { CircularProgressbar } from 'react-circular-progressbar';
+import 'react-circular-progressbar/dist/styles.css';
+import BadgeDetails from './../../components/Modal/BadgeDetails';
+import $ from 'jquery';
 import Loading from '../../components/Loading/loading';
-import Button from 'react-bootstrap/Button'
-import Modal from 'react-bootstrap/Modal';
-import { AllFeatures } from "../../components/Services/core";
-import { getIsEnabled } from "../../constants/constants";
+import { LocalDateTime } from '../../constants/constants';
+import ImageUtils from "../../components/Utils/ImageUtils/ImageUtils";
+import Empty from "../../components/Utils/Empty/Empty";
+import { withTranslation } from 'react-i18next';
 import StorageUtils from '../../containers/utils/StorageUtils';
-import {connect} from 'react-redux';
-import {setWarningPopupStatus} from '../../redux/actions/commonActions';
 
 const Storage = new StorageUtils();
-const userAchivements = JSON.parse(localStorage.getItem('userAchivements'));
-var qs = require('qs');
-//issue understanding still in pending
-class Quests extends React.Component {
+class Quest extends React.Component {
     _isMounted = false;
+
     constructor(props) {
         super(props);
 
         this.state = {
-            bannerClosed: 0,
-            inReviewCount: 0,
-            pendingCount: '',
-            language: 'en',
-            questModal: false,
-            questModalId: '',
-            loading: 1,
-            showAdmin: false,
-            fromTeams: false,
             questList: [],
-            questLoading: 1,
-            questResults: [],
-            mQuestModal: false,
-            mQuestModalId: '',
-            userAvailablePoint: 0,
-            setInitialTabChange: false,
-        };
-        this.adminChild = React.createRef();
-        this.pendingTabChild = React.createRef();
-
-        this.handleClickOutside = this.handleClickOutside.bind(this);
+            avatars: [],
+            badgeInfo: [],
+            openModal: 0,
+            loading: 1,
+            loadingBadgeData: 1,
+            language: 'en'
+        }
     }
-
-    getQuestCount() {
-        new Api(GetAPIHeader(Storage.getAccessToken())).v31.getModeratorQuest(undefined, undefined)
-            .then(res => {
-                this.setState({ pendingCount: res.Total });
-                // tab redirection from url
-                if (this.props.match.params.tab) {
-                    $('#nav-' + this.props.match.params.tab + '-tab').tab('show')
-                }
-                if (!this.state.setInitialTabChange) {
-                    this.setTabChanging();
-                }
-                this.setState({
-                    setInitialTabChange: true
-                });
-            }).catch((err) => {				ErrorHandling(err)
-                console.log(err);
-            });
-    }
-
     getQuestList() {
-        this.setState({ questLoading: 1 });
         new Api(GetAPIHeader(Storage.getAccessToken())).v31.getUserQuest(undefined, undefined)
             .then(results => {
                 if (results != null) {
-                    this.setState({ questResults: results.Claimed });
-                    if (localStorage.getItem('activeQuestTab') == '#nav-completed') {
+                    if (this.props.completed) {
                         this.mapQuest(results.Claimed);
                     } else {
                         this.mapQuest(results.Incomplete);
                     }
+
                 } else {
-                    this.setState({ questLoading: 0 });
+                    this.setState({ loading: 0 });
                 }
             }).catch((err) => {				ErrorHandling(err)
-                console.log(err);
+                console.log(err)
             });
     }
 
     mapQuest(result) {
-        const myQuest = result != undefined && result != null && result != "" && result.length > 0 ? result.map((item) => {
+        const myQuest = result.map((item) => {
             return {
                 BadgeCode: item.BadgeCode,
                 BadgeImageUrl: item.BadgeImageUrl,
@@ -121,10 +81,10 @@ class Quests extends React.Component {
                 UpdatedDate: item.UpdatedDate,
                 Skills: item.Skills,
                 Conditions: item.Conditions,
-                CreatedDate: item.CreatedDate,
                 MyConditions: [...item.Conditions,
                 {
                     Total: item.Conditions.length,
+                    // Name: item.Conditions.filter((innerItem) => innerItem.isModeratorQuest === true).length == 1 ? item.Conditions.filter((innerItem) => innerItem.isModeratorQuest === true)[0].ModeratorName : (item.Conditions.filter((innerItem) => innerItem.isModeratorQuest === true).length + ' People'),
                     ModeratorsList: item.Conditions.filter((item, i, arr) =>
                         arr.findIndex(t => t.ModeratorId === item.ModeratorId) === i && item.isModeratorQuest === true).map(x => {
                             return (
@@ -132,7 +92,6 @@ class Quests extends React.Component {
                                     id: x.ModeratorId,
                                     img: x.ModeratorImageUrl,
                                     name: x.ModeratorName
-
                                 }
                             )
                         }),
@@ -144,382 +103,196 @@ class Quests extends React.Component {
                         arr.findIndex(t => t.ModeratorId === item.ModeratorId) === i && item.isModeratorQuest === true).length,
                 }],
             }
-        }) : [];
-        if (myQuest) {
-            this.setState({ questList: myQuest, questLoading: 0 });
-        }
+        });
+        this.setState({ questList: myQuest, loading: 0 });
+
     }
 
-    loadOnlyClaimed(){
-        this.mapQuest(this.state.questResults)
-        $(".page-wrapper").addClass("toggled");
-        localStorage.setItem('activeQuestTab', "#nav-completed");
-        $('.nav-tabs a[href="#nav-completed"]').tab('show');
+    refreshQuestList() {
+        this.getQuestList();
+        this.props.getTabCount();
     }
 
-    getPoints() {
-        new Api(GetAPIHeader(Storage.getAccessToken())).v31.getUserPoints()
+    getBadgeInfo(code) {
+        const UserProfile = Storage.getProfile();;
+        new Api(GetAPIHeader(Storage.getAccessToken())).v31.getBadge(UserProfile.email, code)
             .then(results => {
-                this.setState({
-                    userAvailablePoint: results.AccumulatedEligiblePoints
-                });
-                localStorage.setItem('AccumulativeEligiblePoints', results.AccumulatedEligiblePoints)
+                this.setState({ badgeInfo: results, loadingBadgeData: 0 })
             }).catch((err) => {				ErrorHandling(err)
                 console.log(err)
             });
     }
 
-    componentDidMount() {
-        const {dispatch} = this.props;
-        dispatch(setWarningPopupStatus(false));
-        this._isMounted = true;
-        this.getUnitTypeMobileForBackOffice();
-        this.getQuestCount();
-        if (this.props.location.search) {
-            let queryParam = qs.parse(this.props.location.search, { ignoreQueryPrefix: true });
-            if (queryParam.avoidDuplicate) {
-                this.props.history.push("./quest");
+    openModal(badgeCode) {
+        if (badgeCode !== '') {
+            this.getBadgeInfo(badgeCode);
+            this.setState({ openModal: 1 });
+        }
+    }
+
+    HideModal() {
+        this.setState({ openModal: 0 });
+        $('#myModal').modal('hide');
+    }
+
+    formatDate(string) {
+        return moment(string).format('DD MMMM YYYY');
+    }
+
+    toLocal(date) {
+        return moment.utc(date, 'YYYY-MM-DD HH:mm:ss A').local();
+    }
+
+    isExpired(dueDate) {
+        return moment([]).isAfter(this.toLocal(dueDate).add(1, 'days'));
+    }
+
+    getQuestTimeLeft(questEndDateTime) {
+        let startDate = moment.utc().add('days', 7).format('YYYY-MM-DD hh:mm A');
+        let endDate = questEndDateTime;
+        let retriveDate;
+        let fromNow = moment(LocalDateTime(endDate)).fromNow();
+        if (endDate < startDate) {
+            if (fromNow === 'in a day') {
+                retriveDate = 'Tomorrow';
+            } else if (fromNow === 'in an hour') {
+                retriveDate = '1 hour';
             } else {
-                this.getQuestList();
+                retriveDate = fromNow.replace('in', '');
             }
         } else {
+            retriveDate = moment(endDate).format('DD MMM YYYY');
+        }
+        return retriveDate;
+    }
+
+    calculateCompletedTasks(QuestTasks) {
+        return QuestTasks.length === QuestTasks.filter((tasks) => tasks.Completed === true).length ? '✓' : QuestTasks.filter((tasks) => tasks.Completed === true).length;
+    }
+
+    calculateTotalTasks(QuestTasks) {
+        if (QuestTasks.length == 0) {
+            return 0;
+        } else {
+            return 100 * (QuestTasks.filter((tasks) => tasks.Completed === true).length / QuestTasks.length);
+        }
+    }
+
+    componentDidMount() {
+        this._isMounted = true;
+        if (this._isMounted) {
             this.getQuestList();
         }
-        this.accessQuestModal();
-        this.getPoints();
-        document.addEventListener('click', this.handleClickOutside, true);
-        localStorage.setItem('activeQuestTab', "#nav-ongoing"); 
     }
-
     componentWillUnmount() {
-        document.removeEventListener('click', this.handleClickOutside, true);
-        localStorage.setItem('activeQuestTab', "#nav-ongoing");  
+        this._isMounted = false;
     }
-
-    getUnitTypeMobileForBackOffice() {
-        let checkExist = JSON.parse(localStorage.getItem('unitCategoryResponse'));
-        if (checkExist == null || checkExist == "" || checkExist == undefined) {
-            let reqUnitIds = { "UnitTypeIds": [], "UnitValueIds": [] };
-            new Api(GetAPIHeader(Storage.getAccessToken())).v31.getUnitTypeMobileForBackOffice(reqUnitIds, { pageNumber: 1, pageSize: 100000, isCreateUser: false })
-                .then(unitResponse => {
-                    if (unitResponse.Result.length > 0) {
-                        localStorage.setItem('unitCategoryResponse', JSON.stringify(unitResponse));
-                    }
-                })
-        }
-    }
-
-    accessQuestModal() {
-        if (this.props.location.search) {
-            let queryParam = qs.parse(this.props.location.search, { ignoreQueryPrefix: true });
-            if ((queryParam.questid || queryParam.mquestid) && queryParam.host) {
-                this.setState({ fromTeams: true });
-            }
-            if (queryParam.questid) {
-                this.setState({
-                    questModal: true,
-                    questModalId: queryParam.questid
-                }, () => {
-                    this.renderModal();
-                })
-            }
-
-            if (queryParam.mquestid) {
-                this.setState({
-                    mQuestModal: true,
-                    mQuestModalId: queryParam.mquestid
-                }, () => {
-                    this.renderModeratorQuestModal();
-                })
-            }
-        }
-    }
-
-    renderModeratorQuestModal() {
-        const { mQuestModal, mQuestModalId } = this.state;
-        $("#questModal").modal("show");
-        if (this.state.fromTeams) {
-            $('.modal-backdrop').addClass('modal-backdrop--custom');
-        }
-        if(mQuestModal) {
+    render() {
+        const pointsType = this.props.PointsType;
+        const {t} = this.props;
         return (
-                <div id="questModal" className="modal fade p-0 m-0 modal--custom" tabindex="-1" role="dialog">
-                <div className="modal-dialog modal-dialog-centered modal-lg" role="document">
-                    <div className="modal-content p-0 m-0 border-0">
-                        <div className="modal-body p-0">
-                            <PendingTab
-                                PointsType={(userAchivements != null && userAchivements.PointsType) ? userAchivements.PointsType : "ep"}
-                                mQuestModalId={mQuestModalId}
-                                viewQuestPopup={true}
-                                getTabCount={this.getQuestCount.bind(this)}
-                                marginBottom="app-card mb-0"
-                            />
-                        </div>
-                    </div>
-                </div>
-                 </div>
-             )
-        }
-    }
+            <div>
+                {this.state.loading ? <Loading Height="0" /> :
+                    this.state.questList.length === 0 ?
+                        <Empty image={emptyQuest} text={t("quest.emptyQuest")} />
+                        : this.state.questList.filter((i, index) => (index < 1)).map((quest) =>
+                            <div key={quest.Id}>
+                                <div className="app-card mb-4">
+                                    <div className="clearfix mb-2">
+                                        <span className="app-border-blue-badge-pill">{quest.CategoryName}</span>&nbsp;
+                                        {quest.Skills.map((skills) =>
+                                            <span className="app-blue-skills-pill mt-1 mr-1">{skills.Name}</span>
+                                        )}
+                                        <p className="text-primary font-weight-bold small float-right">
+                                            <i className="fa fa-star"></i>{PointsFormat(quest.Point) + ' ' + pointsType}
+                                        </p>
+                                    </div>
+                                    {quest.Completed ?
+                                        <i className="icon-check_circle icon-large text-primary float-left mr-2"></i> :
+                                        <CircularProgressbar value={this.calculateTotalTasks(quest.Conditions)}
+                                            className="progress1" strokeWidth={15}
+                                            style={{ border: '2px solid #b5bbc1', borderRadius: '50%' }} />}
 
-    handleClose = () => {
-        this.setState({ questModal: false, questModalId: '' });
-        $("#questModal").modal("hide");
-    }
+                                    <h5 className="">{quest.Name}</h5>
+                                    <p className="normal">{quest.Description}</p>
 
-    handleClickOutside(event) {
-        const self = this;
-        var modal = document.getElementById('questModal');
-        window.onclick = function (event) {
-            if (event.target == modal) {
-                self.handleClose();
-            }
-        }
-        if(event.target.id === 'questModal') {
-            this.setState({mQuestModal: false, mQuestModalId: ''});
-            $("#questModal").modal("hide");
-        }
-    }
+                                    <Stepper conditions={quest.Conditions} userQuestId={quest.Id}
+                                        onRefresh={this.refreshQuestList.bind(this)} />
 
-    editAdminQuest(reqId) {
-        this.getQuestById(reqId);
-    }
+                                    <div className="line"></div>
 
-    getQuestById(id){
-        if(id && id != null && id != "" && id != undefined){
-            this.props.history.push("/editquest"+ "?editId="+id);
-        }
-    }
+                                    <div className="d-flex flex-wrap" style={{ wordBreak: 'break-word', overflow: 'hidden' }}>
+                                        <div className="flex-fill d-flex p-3">
+                                            <div>
+                                                <img src={badgeIcon} alt=""
+                                                    style={{ width: 36 }}
+                                                    className="bg-light-green rounded-circle p-2 mr-2"
+                                                    data-target="#myModal"
+                                                    onClick={() => this.openModal(quest.BadgeCode)} />
+                                                {this.state.openModal === 1 &&
+                                                    <BadgeDetails className="show" header={this.state.badgeInfo.Name}
+                                                        badgeBody={this.state.badgeInfo}
+                                                        onHide={this.HideModal.bind(this)}
+                                                        loading={this.state.loadingBadgeData} />
+                                                }
+                                            </div>
+                                            <div>
+                                                <p className="small font-weight-bold" style={{ wordBreak: 'break-word', overflow: 'hidden' }}>{quest.BadgeName !== '' ? quest.BadgeName : '-'}</p>
+                                                <p className="small text-gray">{t("quest.badge")}</p>
+                                            </div>
+                                        </div>
 
-    setTabChanging() {
-        let th = this;
-        $(document).ready(function () {
-            $('a[data-toggle="tab"]').on("shown.bs.tab", function (e) {
-                localStorage.setItem('questActiveTab', $(e.target).attr('href'));
+                                        <div className="flex-fill d-flex p-3" style={{ wordBreak: 'break-word', overflow: 'hidden' }}>
+                                            <div
+                                                className="mr-2 bg-light-red rounded-circle text-center d-table"
+                                                style={{ width: 36, height: 36 }}>
+                                                <i className="far fa-clock text-danger d-table-cell align-middle"></i>
+                                            </div>
+                                            <div>
+                                                <p className="small font-weight-bold">{quest.HasNoExpireDate === true ? '-' : this.getQuestTimeLeft(quest.EndDate)}</p>
+                                                <p className="small text-gray">{t("quest.timeLeft")}</p>
+                                            </div>
+                                        </div>
 
-                if ($(e.target).attr("href") == "#nav-ongoing") {
-                    $(".page-wrapper").addClass("toggled");
-                    localStorage.setItem('activeQuestTab', "#nav-ongoing");
-                    $('.nav-tabs a[href="#nav-ongoing"]').tab('show');
-                    th.getQuestList();
-                }
-
-                if ($(e.target).attr("href") == "#nav-completed") {
-                    $(".page-wrapper").addClass("toggled");
-                    localStorage.setItem('activeQuestTab', "#nav-completed");
-                    $('.nav-tabs a[href="#nav-completed"]').tab('show');
-                    th.getQuestList();
-                }
-
-                if ($(e.target).attr("href") == "#nav-moderator") {
-                    $(".page-wrapper").addClass("toggled");
-                    localStorage.setItem('activeQuestTab', "#nav-moderator");
-                    $('.nav-tabs a[href="#nav-moderator"]').tab('show');
-                    th.pendingTabChild.current.getInReviewQuests(1);
-                }
-
-                if ($(e.target).attr("href") == "#nav-admin") {
-                    $(".page-wrapper").removeClass("toggled");
-                    localStorage.setItem('activeQuestTab', "#nav-admin");
-                    $('.nav-tabs a[href="#nav-admin"]').tab('show');
-                    th.adminChild.current.clearPreviousState();
-                    th.adminChild.current.getUnitTypeMobileForBackOffice();
-                }
-            });
-        });
-        var activeTab = localStorage.getItem('questActiveTab');
-        if (activeTab == "#nav-admin") {
-            $(".page-wrapper").removeClass("toggled");
-            $('.nav-tabs a[href="' + activeTab + '"]').tab('show');
-            th.setState({ showAdmin: true })
-        }
-    }
-
-    CloneQuest(cloneId){
-        if(cloneId && cloneId != null && cloneId != "" && cloneId != undefined){
-            this.props.history.push("/editquest"+ "?cloneId="+cloneId);
-        } 
-    }
-
-    closeModal() {
-        this.setState({
-            questModal: false
-        });
-        this.props.history.push('./quest')
-    }
-    renderModal() {
-        const { questModal, questModalId, questLoading } = this.state;
-        $("#questModal").modal("show");
-        if (this.state.fromTeams) {
-            $('.modal-backdrop').addClass('modal-backdrop--custom');
-        }
-        return (
-            questModal && <div style={{ padding: '0px' }} className="p-0 m-0">
-                <Modal
-                    // dialogClassName={"questModal"}
-                    show={questModal}
-                    backdrop={questModal}
-                    onHide={() => { this.closeModal() }}
-                    centered
-                    size="lg"
-                    className="p-0 m-0"
-                    aria-labelledby="contained-modal-title-vcenter"
-                >
-                    <div className={"maincontainer p-0 m-0 border-0"}>
-                        <Modal.Body className="p-0">
-                            {questLoading ? <Loading /> :
-                                <QuestList
-                                    PointsType={(userAchivements != null && userAchivements.PointsType) ? userAchivements.PointsType : "ep"}
-                                    questModalId={questModalId}
-                                    getTabCount={this.getQuestCount.bind(this)}
-                                    marginBottom="app-card mb-0"
-                                    questList={this.state.questList}
-                                    questResults={this.loadOnlyClaimed.bind(this)}
-                                    loading={this.state.questLoading}
-                                    getQuestList={this.getQuestList.bind(this)}
-                                />}
-                        </Modal.Body>
-                    </div>
-                </Modal>
+                                        <div className="flex-fill d-flex p-3" style={{ wordBreak: 'break-word', overflow: 'hidden' }}>
+                                            <div className="mr-2">
+                                                {Object.keys(quest.MyConditions).map((items) => {
+                                                    return quest.MyConditions[items].ModeratorsList !== undefined ?
+                                                        quest.MyConditions[items].ModeratorsList.map((subitem, idx) => {
+                                                            return (
+                                                                subitem.isModeratorQuest === false ? null :
+                                                                    subitem.img !== null &&
+                                                                    <div
+                                                                        className={"float-left " + (idx >= 1 && 'multi-mod-img')}>
+                                                                        <ImageUtils src={subitem.img} name={subitem.name}
+                                                                            width={36} />
+                                                                    </div>
+                                                            )
+                                                        }) : null
+                                                })
+                                                }
+                                            </div>
+                                            {quest.MyConditions.map((questConditions) => {
+                                                return questConditions.Id !== undefined ? null :
+                                                    questConditions.Name !== '0 People' ?
+                                                        <div key={questConditions.Name}>
+                                                            <p className="small font-weight-bold" style={{ wordBreak: 'break-word', overflow: 'hidden' }}>{questConditions.Name}</p>
+                                                            <p className="small text-gray">{questConditions.Count == 1 ? 'Moderator' : 'Moderators'}</p>
+                                                        </div>
+                                                        : null
+                                            })}
+                                        </div>
+                                    </div>
+                                    <div className="line"></div>
+                                    <p className="small mt-3 text-gray">
+                                        <i className="far fa-clock"></i>&nbsp;{t("quest.created")}:&nbsp;{this.formatDate(LocalDateTime(quest.StartDate))}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
             </div>
         )
     }
-
-
-
-
-    render() {
-        const { t } = this.props;
-
-        return (
-            <>
-                <SlimLoader isAnimating={!this._isMounted} />
-                <div className="container">
-                    <h3 className="page-header">{t("quest.quest")}</h3>
-                    {this.renderModal()}
-                    {this.renderModeratorQuestModal()}
-                    {this.state.pendingCount > 0 ?
-                        <nav>
-                            <div className="nav nav-tabs app-tabs" id="nav-tab" role="tablist">
-                                <a className="nav-item nav-link active" id="nav-ongoing-tab"
-                                    data-toggle="tab" href="#nav-ongoing" role="tab" aria-controls="nav-ongoing"
-                                    aria-selected="true" onClick={() => this.setState({ showAdmin: false, questLoading: 1, questList: [] })}>{t("quest.ongoing")}</a>
-
-                                <a className="nav-item nav-link " id="nav-completed-tab"
-                                    data-toggle="tab" href="#nav-completed" role="tab" aria-controls="nav-completed"
-                                    aria-selected="false" onClick={() => this.setState({ showAdmin: false, questLoading: 1, questList: [] })}>{t("quest.completed")}</a>
-                                <a className="nav-item nav-link " id="nav-moderator-tab"
-                                    data-toggle="tab" href="#nav-moderator" role="tab" aria-controls="nav-moderator"
-                                    aria-selected="false" onClick={() => this.setState({ showAdmin: false, modQuestLoading: 1, modPendingArray: [] })}>{t("quest.moderator")}</a>
-
-                                {(getIsEnabled(AllFeatures.BO_QUEST_MANAGE) || getIsEnabled(AllFeatures.BO_QUEST_CreateEdit_MANAGE)) && <a className="nav-item nav-link " id="nav-admin-tab"
-                                    data-toggle="tab" href="#nav-admin" role="tab" aria-controls="nav-admin"
-                                    aria-selected="false" onClick={() => this.setState({ showAdmin: true })}>{t("quest.admin")}</a>
-                                }
-
-                            </div>
-                        </nav>
-                        :
-                        <nav>
-                            <div className="nav nav-tabs app-tabs" id="nav-tab" role="tablist">
-                                <a className="nav-item nav-link active" id="nav-ongoing-tab"
-                                    data-toggle="tab" href="#nav-ongoing" role="tab" aria-controls="nav-ongoing"
-                                    aria-selected="true" onClick={() => this.setState({ showAdmin: false, questLoading: 1, questList: [] })}>{t("quest.ongoing")}</a>
-
-                                <a className="nav-item nav-link " id="nav-completed-tab"
-                                    data-toggle="tab" href="#nav-completed" role="tab" aria-controls="nav-completed"
-                                    aria-selected="false" onClick={() => this.setState({ showAdmin: false, questLoading: 1, questList: [] })}>{t("quest.completed")}</a>
-
-                                {(getIsEnabled(AllFeatures.BO_QUEST_MANAGE) || getIsEnabled(AllFeatures.BO_QUEST_CreateEdit_MANAGE)) &&
-                                    <a className="nav-item nav-link " id="nav-admin-tab"
-                                        data-toggle="tab" href="#nav-admin" role="tab" aria-controls="nav-admin"
-                                        aria-selected="false" onClick={() => this.setState({ showAdmin: true })}>{t("quest.admin")}</a>
-                                }
-                            </div>
-                        </nav>
-                    }
-                    {
-                        this.state.showAdmin ?
-                            <div className="row float-right" style={{ marginTop: "-2.5rem", paddingRight: "16px" }}>
-                                <div className="col col-sm-12">
-                                    <form className="form-inline my-2 my-lg-0">
-                                    <Button className="creteQuestButton" onClick={() => {
-                                        $(".page-wrapper").addClass("toggled");
-                                        this.props.history.push("/editquest")
-                                        }}>
-                                            <span className="textAlignment">{t("quest.createNewQuest")}</span>
-                                        </Button>
-                                    </form>
-                                </div>
-                            </div>
-                            :
-                            null
-                    }
-                    {!this.state.showAdmin &&
-                        <HeaderBanner bannerImg={bannerIcon}
-                            bannerHeader={t("quest.bannerHeader")}
-                            bannerDesc={(t("quest.bannerDesc"))}
-                            bannerBackground={'#ffefe4'} bannerH4Color={'#ff9649'} />}
-                    <br />
-
-                    <div className="row">
-                        <div className={this.state.showAdmin ? "col-sm-12" : "col-sm-8"}>
-                            <div className="tab-content" id="nav-tabContent">
-                                <div className="tab-pane fade show active" id="nav-ongoing" role="tabpanel"
-                                    aria-labelledby="nav-ongoing-tab">
-                                    <QuestList completed={false}
-                                        PointsType={(userAchivements != null && userAchivements.PointsType) ? userAchivements.PointsType : "ep"}
-                                        getTabCount={this.getQuestCount.bind(this)}
-                                        questList={this.state.questList}
-                                        loading={this.state.questLoading}
-                                        getQuestList={this.getQuestList.bind(this)} />
-                                </div>
-                                <div className="tab-pane fade" id="nav-completed" role="tabpanel"
-                                    aria-labelledby="nav-completed-tab">
-                                    <QuestList completed={true}
-                                        PointsType={(userAchivements != null && userAchivements.PointsType) ? userAchivements.PointsType : "ep"}
-                                        questList={this.state.questList}
-                                        loading={this.state.questLoading}
-                                        getQuestList={this.getQuestList.bind(this)} />
-                                </div>
-                                <div className="tab-pane fade" id="nav-moderator" role="tabpanel"
-                                    aria-labelledby="nav-moderator-tab">
-                                    <PendingTab PointsType={(userAchivements != null && userAchivements.PointsType) ? userAchivements.PointsType : "ep"}
-                                        ref={this.pendingTabChild} getTabCount={this.getQuestCount.bind(this)} />
-                                </div>
-                                {(getIsEnabled(AllFeatures.BO_QUEST_MANAGE) || getIsEnabled(AllFeatures.BO_QUEST_CreateEdit_MANAGE)) && <div className="tab-pane fade" id="nav-admin" role="tabpanel" aria-labelledby="nav-admin-tab">
-                                    <AdminQuest ref={this.adminChild} editAdminQuest={this.editAdminQuest.bind(this)} CloneQuest={this.CloneQuest.bind(this)}/>
-                                </div>}
-                            </div>
-                        </div>
-                        {!this.state.showAdmin &&
-                            <div className="col-sm-4">
-                                {getIsEnabled(AllFeatures.BO_QUEST_CreateEdit_MANAGE) && <div className="align-items-center justify-content-center text-center mb-3">
-                                    <Button className="createQuestButtonList" onClick={() => { this.props.history.push("/editquest") }}>
-                                        <span className="textAlignment">{t("quest.createNewQuest")}</span>
-                                    </Button>
-                                </div>
-                                }
-                                <div className="app-card">
-                                    <h6 className="text-gray mb-3">{t("quest.points")}</h6>
-                                    <div className="text-center points-circular-progress">
-                                        <CircularProgressBar
-                                            strokeWidth="20"
-                                            sqSize="210"
-                                            duration={0.5}
-                                            easingFunction={easeQuadInOut}
-                                            percentage={this.state.userAvailablePoint}
-                                            myRank='null'
-                                            UnlockPoints={userAchivements != null ? userAchivements.UnlockPoints : ""}
-                                            PointsType={(userAchivements != null && userAchivements.PointsType) ? userAchivements.PointsType : "ep"} />
-                                    </div>
-                                </div>
-                            </div>}
-
-                    </div>
-                </div>
-            </>
-        )
-    }
 }
-export default withTranslation('translation')((connect())(withRouter(Quests)));
+
+export default withTranslation('translation')(Quest);
